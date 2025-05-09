@@ -6,12 +6,13 @@ import axios from 'axios';
 import FetchedData from './components/FetchedData';
 
 function App() {
-   const [count, setCount] = useState(0)
-   const [products, setProducts] = useState([])
-   const [loading, setLoading] = useState(false);
+  const [count, setCount] = useState(0)
+  const [products, setProducts] = useState([])
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [search, setSearch] = useState('');
-   useEffect(() => {
+
+  useEffect(() => {
     //1st method:
     // const fetchProducts = async () => {
     //   try {
@@ -21,41 +22,48 @@ function App() {
     //     console.error('Error fetching products:', error);
     //   }
     // }
-     // fetchProducts();
+    // fetchProducts();
 
-     //2nd method:
+    //2nd method:
     //using  immediately invoked function expression (IIFE)
     const controller = new AbortController(); //AbortController is used to cancel the request
-     ;(async () =>{
-       try{
-         setLoading(true);
-         setError(false);
-         const response = await axios.get('api/products?search=' + search, {
-          signal: controller.signal 
-         
-         })
-         console.log(response.data);
-         setProducts(response.data);
-         setLoading(false);
-       }
-       catch(error){
-        if(axios.isCancel(error)){ //axios.isCancel() checks if the error is due to a cancellation
-          console.log(error.message)
-          return;
-        }
-         setError(true);
-         console.error('Error fetching products:', error);
-       }
-     })()
-//cleanup part.. executed when component unmounts
-    //or when the search changes
-     return () =>{
-      controller.abort();
-     }
-   }, [search])
 
-//calling the customReactQuery function
-//const [products, loading, error] = customReactQuery('/api/products')
+    const debounceTimer = setTimeout(() => {
+      ;(async () => {
+        try {
+          setLoading(true);
+          setError(false);
+          const response = await axios.get('/api/products?search=' + search, {
+            signal: controller.signal
+          })
+          console.log(response.data);
+          setProducts(response.data);
+        }
+        catch (error) {
+          // error.name === 'CanceledError' works for fetch cancellations with AbortController
+          if (error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
+            console.log('Request was cancelled:', error.message);
+            return;
+          }
+          setError(true);
+          console.error('Error fetching products:', error);
+        }
+        finally {
+          setLoading(false);
+        }
+      })()
+    }, 500); // debounce delay in ms
+
+    //cleanup part.. executed when component unmounts
+    //or when the search changes
+    return () => {
+      clearTimeout(debounceTimer); // cancel debounce if search changes quickly
+      controller.abort(); // cancel fetch request if still pending
+    }
+  }, [search])
+
+  //calling the customReactQuery function
+  //const [products, loading, error] = customReactQuery('/api/products')
 
   //  if(error){
   //   return <h2>Something went wrong</h2>
@@ -65,27 +73,27 @@ function App() {
   //  }
 
   //2nd method:
- // return error && <h2>Something went wrong</h2>
+  // return error && <h2>Something went wrong</h2>
 
+  return (
+    <>
+      <h1>Api handling</h1>
 
-return (
-  <>
-  <h1>Api handling</h1>
+      <input
+        type="text"
+        placeholder='Search...'
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
 
-  <input type="text" placeholder='Search...'
-  value ={search}
-  onChange={(e)=> setSearch(e.target.value)}
-   />
-
-  {loading && <h2>Loading...</h2>}
-  <FetchedData products={products} />
-  {error && <h2>Something went wrong</h2>}
-  <h2>Number of Products: {products.length}</h2>
-  </>
-)
+      {loading && <h2>Loading...</h2>}
+      <FetchedData products={products} />
+      {error && <h2>Something went wrong</h2>}
+      <h2>Number of Products: {products.length}</h2>
+    </>
+  )
 }
 export default App
-
 
 // const customReactQuery = (urlPath) => {
 //   const [count, setCount] = useState(0)
